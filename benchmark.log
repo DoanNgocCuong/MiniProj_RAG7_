@@ -1,0 +1,5 @@
+2025-04-27 10:25:46,728 - INFO - Starting benchmark process
+2025-04-27 10:25:46,728 - INFO - Loaded 20 queries from benchmark_query.json
+2025-04-27 10:25:46,728 - INFO - Starting benchmark with 20 queries
+2025-04-27 10:26:19,280 - INFO - Query 1 completed in 32.54s
+2025-04-27 10:26:24,260 - INFO - Query 2 completed in 4.97s

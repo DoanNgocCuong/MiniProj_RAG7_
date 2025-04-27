@@ -1,0 +1,183 @@
+PS D:\GIT\MiniProj_RAG7> python src/run_benchmark.py
+2025-04-27 11:02:52,191 - INFO - ==================================================
+2025-04-27 11:02:52,191 - INFO - Starting new benchmark session at 2025-04-27 11:02:52
+2025-04-27 11:02:52,192 - INFO - Log file: logs\benchmark_20250427_110252.log
+2025-04-27 11:02:52,192 - INFO - ==================================================
+2025-04-27 11:02:52,192 - INFO - Starting benchmark process
+2025-04-27 11:02:52,192 - INFO - Loaded 20 queries from benchmark_query.json
+2025-04-27 11:02:52,192 - INFO - Starting benchmark with 20 queries
+2025-04-27 11:02:52,192 - INFO - Processing query 1/20
+2025-04-27 11:02:52,192 - INFO - Query text: Learn có mấy lộ trình chính?
+
+Query 1/20: Learn có mấy lộ trình chính?
+2025-04-27 11:02:57,218 - INFO - Query 1 completed in 5.03s
+2025-04-27 11:02:57,218 - INFO - Response: Learn có hai lộ trình chính.
+2025-04-27 11:02:57,218 - INFO - Processing query 2/20
+2025-04-27 11:02:57,218 - INFO - Query text: Lộ trình giao tiếp của Learn có bao nhiêu chủ đề?
+
+Query 2/20: Lộ trình giao tiếp của Learn có bao nhiêu chủ đề?
+2025-04-27 11:03:01,083 - INFO - Query 2 completed in 3.86s
+2025-04-27 11:03:01,083 - INFO - Response: Lộ trình giao tiếp của Learn có hai chủ đề chính: giao tiếp và từ vựng.
+2025-04-27 11:03:01,083 - INFO - Processing query 3/20
+2025-04-27 11:03:01,083 - INFO - Query text: Các bước học trong lộ trình giao tiếp là gì?
+
+Query 3/20: Các bước học trong lộ trình giao tiếp là gì?
+2025-04-27 11:03:26,251 - INFO - Query 3 completed in 25.17s
+2025-04-27 11:03:26,251 - INFO - Response: Các bước học trong lộ trình giao tiếp là: Nạp cụm → Thực hành → Mở rộng nâng cao.
+2025-04-27 11:03:26,251 - INFO - Processing query 4/20
+2025-04-27 11:03:26,251 - INFO - Query text: Đối tượng nào phù hợp với Learn?
+
+Query 4/20: Đối tượng nào phù hợp với Learn?
+2025-04-27 11:03:57,593 - INFO - Query 4 completed in 31.34s
+2025-04-27 11:03:57,593 - INFO - Response: Đối tượng phù hợp với Learn là những người mới bắt đầu học giao tiếp và từ vựng, đặc biệt là những ai muốn cải thiện kỹ năng giao tiếp nhanh chóng và hiệu quả thông qua việc ôn tập và sử dụng phương pháp spaced-repetition.
+2025-04-27 11:03:57,593 - INFO - Processing query 5/20
+2025-04-27 11:03:57,593 - INFO - Query text: Onion GPT có cho phép cá nhân hoá kịch bản không?
+
+Query 5/20: Onion GPT có cho phép cá nhân hoá kịch bản không?
+2025-04-27 11:04:26,390 - INFO - Query 5 completed in 28.80s
+2025-04-27 11:04:26,390 - INFO - Response: Có, Onion GPT cho phép cá nhân hóa kịch bản giao tiếp dựa trên các tình huống cơ bản trong công việc và đời sống.
+2025-04-27 11:04:26,397 - INFO - Saved intermediate results after 5 queries
+2025-04-27 11:04:26,398 - INFO - Processing query 6/20
+2025-04-27 11:04:26,406 - INFO - Query text: Onion GPT hiện có mấy chủ đề giao tiếp?
+
+Query 6/20: Onion GPT hiện có mấy chủ đề giao tiếp?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:05:26,313 - INFO - Query 6 completed in 59.91s
+2025-04-27 11:05:26,318 - INFO - Response:
+2025-04-27 11:05:26,318 - INFO - Processing query 7/20
+2025-04-27 11:05:26,318 - INFO - Query text: Trình độ tối thiểu để dùng Onion GPT?
+
+Query 7/20: Trình độ tối thiểu để dùng Onion GPT?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:06:27,056 - INFO - Query 7 completed in 60.74s
+2025-04-27 11:06:27,056 - INFO - Response: 
+2025-04-27 11:06:27,056 - INFO - Processing query 8/20
+2025-04-27 11:06:27,064 - INFO - Query text: Gym có bao nhiêu phòng Club?
+
+Query 8/20: Gym có bao nhiêu phòng Club?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:07:27,311 - INFO - Query 8 completed in 60.25s
+2025-04-27 11:07:27,311 - INFO - Response: 
+2025-04-27 11:07:27,311 - INFO - Processing query 9/20
+2025-04-27 11:07:27,311 - INFO - Query text: Mỗi phòng Club chứa tối đa bao nhiêu người?
+
+Query 9/20: Mỗi phòng Club chứa tối đa bao nhiêu người?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:08:28,041 - INFO - Query 9 completed in 60.73s
+2025-04-27 11:08:28,041 - INFO - Response: 
+2025-04-27 11:08:28,041 - INFO - Processing query 10/20
+2025-04-27 11:08:28,041 - INFO - Query text: Nghe hiểu trong Gym có bao nhiêu bài, mấy cấp độ?
+
+Query 10/20: Nghe hiểu trong Gym có bao nhiêu bài, mấy cấp độ?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:09:28,341 - INFO - Query 10 completed in 60.30s
+2025-04-27 11:09:28,341 - INFO - Response: 
+2025-04-27 11:09:28,341 - INFO - Saved intermediate results after 10 queries
+2025-04-27 11:09:28,349 - INFO - Processing query 11/20
+2025-04-27 11:09:28,349 - INFO - Query text: Thư viện IPA của Gym có bao nhiêu bài?
+
+Query 11/20: Thư viện IPA của Gym có bao nhiêu bài?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:10:28,350 - INFO - Query 11 completed in 59.99s
+2025-04-27 11:10:28,350 - INFO - Response:
+2025-04-27 11:10:28,350 - INFO - Processing query 12/20
+2025-04-27 11:10:28,350 - INFO - Query text: Phương pháp chunking gồm mấy loại cụm?
+
+Query 12/20: Phương pháp chunking gồm mấy loại cụm?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:11:29,049 - INFO - Query 12 completed in 60.69s
+2025-04-27 11:11:29,049 - INFO - Response:
+2025-04-27 11:11:29,049 - INFO - Processing query 13/20
+2025-04-27 11:11:29,049 - INFO - Query text: Spaced repetition là gì?
+
+Query 13/20: Spaced repetition là gì?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:12:29,309 - INFO - Query 13 completed in 60.25s
+2025-04-27 11:12:29,309 - INFO - Response:
+2025-04-27 11:12:29,309 - INFO - Processing query 14/20
+2025-04-27 11:12:29,309 - INFO - Query text: Shadowing phải thực hiện như thế nào?
+
+2025-04-27 11:13:29,310 - INFO - Query text: Lợi ích chính của chunking?
+
+Query 15/20: Lợi ích chính của chunking?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab20382025-04-27 11:13:29,310 - INFO - Query text: Lợi ích chính của chunking?
+
+Query 15/20: Lợi ích chính của chunking?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:14:29,308 - INFO - Query 15 completed in 59.99s
+2025-04-27 11:14:29,308 - INFO - Response:
+2025-04-27 11:14:29,308 - INFO - Saved intermediate results after 15 queries
+2025-04-27 11:14:29,308 - INFO - Processing query 16/20
+2025-04-27 11:14:29,308 - INFO - Query text: Profile trong app dùng để làm gì?
+
+Query 16/20: Profile trong app dùng để làm gì?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab20382025-04-27 11:13:29,310 - INFO - Query text: Lợi ích chính của chunking?
+
+Query 15/20: Lợi ích chính của chunking?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:14:29,308 - INFO - Query 15 completed in 59.99s
+2025-04-27 11:14:29,308 - INFO - Response:
+2025-04-27 11:14:29,308 - INFO - Saved intermediate results after 15 queries
+2025-04-27 11:14:29,308 - INFO - Processing query 16/20
+2025-04-27 11:14:29,308 - INFO - Query text: Profile trong app dùng để làm gì?
+2025-04-27 11:13:29,310 - INFO - Query text: Lợi ích chính của chunking?
+
+Query 15/20: Lợi ích chính của chunking?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:14:29,308 - INFO - Query 15 completed in 59.99s
+2025-04-27 11:14:29,308 - INFO - Response:
+2025-04-27 11:14:29,308 - INFO - Saved intermediate results after 15 queries
+2025-04-27 11:14:29,308 - INFO - Processing query 16/20
+2025-04-27 11:14:29,308 - INFO - Query text: Profile trong app dùng để làm gì?
+
+Query 16/20: Profile trong app dùng để làm gì?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:15:30,043 - INFO - Query 16 completed in 60.73s
+2025-04-27 11:15:30,043 - INFO - Response:
+2025-04-27 11:15:30,043 - INFO - Processing query 17/20
+2025-04-27 11:15:30,043 - INFO - Query text: Điểm khác biệt của The Coach so với app khác?    
+
+Query 17/20: Điểm khác biệt của The Coach so với app khác?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:16:30,882 - INFO - Query 17 completed in 60.84s
+2025-04-27 11:16:30,882 - INFO - Response:
+2025-04-27 11:16:30,882 - INFO - Processing query 18/20
+2025-04-27 11:16:30,882 - INFO - Query text: Học phí app khoảng bao nhiêu tiền?
+
+Query 18/20: Học phí app khoảng bao nhiêu tiền?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:17:32,093 - INFO - Query 18 completed in 61.21s
+2025-04-27 11:17:32,093 - INFO - Response: 
+2025-04-27 11:17:32,094 - INFO - Processing query 19/20
+2025-04-27 11:17:32,094 - INFO - Query text: Cảm xúc người học khi dùng app?
+
+Query 19/20: Cảm xúc người học khi dùng app?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:18:32,874 - INFO - Query 19 completed in 60.78s
+2025-04-27 11:18:32,874 - INFO - Response: 
+2025-04-27 11:18:32,874 - INFO - Processing query 20/20
+2025-04-27 11:18:32,874 - INFO - Query text: Chunking giúp giải quyết vấn đề ngữ pháp như thế nào?
+
+Query 20/20: Chunking giúp giải quyết vấn đề ngữ pháp như thế nào?
+Error calling API: 504 Server Error: GATEWAY_TIMEOUT for url: https://api.langflow.astra.datastax.com/lf/28c59750-7ad2-49ac-b013-bafe55d30330/api/v1/run/18b6014b-e8ba-4119-9b7c-9a92fab2038c
+2025-04-27 11:19:33,116 - INFO - Query 20 completed in 60.24s
+2025-04-27 11:19:33,116 - INFO - Response:
+2025-04-27 11:19:33,124 - INFO - Saved intermediate results after 20 queries
+2025-04-27 11:19:33,124 - INFO - Benchmark completed in 1000.93s
+2025-04-27 11:19:33,124 - INFO - ==================================================
+2025-04-27 11:19:33,132 - INFO - 
+Benchmark Summary:
+Total queries: 20
+Average response time: 50.04s
+Min response time: 3.86s
+Max response time: 61.21s
+
+
+Benchmark Summary:
+Total queries: 20
+Average response time: 50.04s
+Min response time: 3.86s
+Max response time: 61.21s
+
+PS D:\GIT\MiniProj_RAG7> 

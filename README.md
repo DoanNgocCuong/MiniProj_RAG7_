@@ -1,1 +1,2 @@
-# MiniProj_RAG7_
+# MiniProj_RAG7
+StepUpEducation
