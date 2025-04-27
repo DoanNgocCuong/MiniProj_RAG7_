@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 import re
 from pydantic import Field, BaseModel
+import pandas as pd
 
 from layers._01_data_ingestion.loader import load_faq_data, preprocess_faq_data
 from layers._03_embedding.embedder import DocumentEmbedder
@@ -74,38 +75,101 @@ def run_benchmark(
 ) -> List[BenchmarkResult]:
     """Chạy benchmark và trả về kết quả"""
     results = []
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    output_file = f"benchmark_results_{timestamp}.xlsx"
     
-    for item in benchmark_data:
+    # Tạo DataFrame rỗng
+    df = pd.DataFrame(columns=[
+        "query", "expected_answer", "actual_answer", 
+        "response_time", "source_id", "timestamp",
+        "evaluation_score", "evaluation_feedback"
+    ])
+    
+    for i, item in enumerate(benchmark_data, 1):
         query = item["query"]
         expected_answer = item["expected_answer"]
         
-        # Đo thời gian xử lý
-        start_time = time.time()
-        
-        # Tìm kiếm tài liệu liên quan
-        relevant_docs = retriever.retrieve_documents(query)
-        
-        # Tạo câu trả lời
-        actual_answer = generator.generate_answer(query, relevant_docs)
-        
-        # Đánh giá câu trả lời
-        evaluation = evaluator.evaluate_answer(query, actual_answer, relevant_docs)
-        
-        # Tính thời gian xử lý
-        processing_time = time.time() - start_time
-        
-        # Lưu kết quả
-        result = BenchmarkResult(
-            query=query,
-            expected_answer=expected_answer,
-            actual_answer=actual_answer,
-            evaluation_score=evaluation["score"],
-            evaluation_feedback=evaluation["feedback"],
-            relevant_docs=relevant_docs,
-            processing_time=processing_time
-        )
-        results.append(result)
-        
+        try:
+            # Đo thời gian xử lý
+            start_time = time.time()
+            
+            # Tìm kiếm tài liệu liên quan
+            relevant_docs = retriever.retrieve_documents(query)
+            
+            # Tạo câu trả lời
+            actual_answer = generator.generate_answer(query, relevant_docs)
+            
+            # Đánh giá câu trả lời
+            evaluation = evaluator.evaluate_answer(query, actual_answer, relevant_docs)
+            
+            # Tính thời gian xử lý
+            processing_time = time.time() - start_time
+            
+            # Lưu kết quả
+            result = BenchmarkResult(
+                query=query,
+                expected_answer=expected_answer,
+                actual_answer=actual_answer,
+                evaluation_score=evaluation["score"],
+                evaluation_feedback=evaluation["feedback"],
+                relevant_docs=relevant_docs,
+                processing_time=processing_time
+            )
+            results.append(result)
+            
+            # In tiến trình
+            print(f"\nĐã xử lý câu hỏi {i}/{len(benchmark_data)}: {query}")
+            print(f"Thời gian xử lý: {processing_time:.2f} giây")
+            
+            # Thêm kết quả vào DataFrame
+            new_row = pd.DataFrame([{
+                "query": query,
+                "expected_answer": expected_answer,
+                "actual_answer": actual_answer,
+                "response_time": processing_time,
+                "source_id": "",
+                "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+                "evaluation_score": evaluation["score"],
+                "evaluation_feedback": evaluation["feedback"]
+            }])
+            df = pd.concat([df, new_row], ignore_index=True)
+            
+            # Lưu kết quả vào file Excel sau mỗi 5 câu hỏi
+            if i % 5 == 0 or i == len(benchmark_data):
+                df.to_excel(output_file, index=False)
+                print(f"\nĐã lưu kết quả của {i} câu hỏi vào file {output_file}")
+            
+        except Exception as e:
+            print(f"\nLỗi khi xử lý câu hỏi {i}: {query}")
+            print(f"Lỗi: {str(e)}")
+            # Lưu kết quả lỗi
+            result = BenchmarkResult(
+                query=query,
+                expected_answer=expected_answer,
+                actual_answer="Lỗi khi xử lý câu hỏi",
+                evaluation_score=0,
+                evaluation_feedback=f"Lỗi: {str(e)}",
+                relevant_docs=[],
+                processing_time=0
+            )
+            results.append(result)
+            
+            # Thêm kết quả lỗi vào DataFrame
+            new_row = pd.DataFrame([{
+                "query": query,
+                "expected_answer": expected_answer,
+                "actual_answer": "Lỗi khi xử lý câu hỏi",
+                "response_time": 0,
+                "source_id": "",
+                "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+                "evaluation_score": 0,
+                "evaluation_feedback": f"Lỗi: {str(e)}"
+            }])
+            df = pd.concat([df, new_row], ignore_index=True)
+            
+            # Lưu kết quả lỗi vào file Excel
+            df.to_excel(output_file, index=False)
+            
     return results
 
 def print_benchmark_results(results: List[BenchmarkResult]):
