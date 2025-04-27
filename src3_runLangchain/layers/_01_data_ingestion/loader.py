@@ -3,16 +3,18 @@ This module helps load documents from different places like websites, PDF files,
 It makes all documents look the same so they can be used easily in other parts of the program.
 """
 
-from typing import List, Union
+from typing import List, Union, Dict, Any
 from langchain_community.document_loaders import (
     WebBaseLoader,
     PyPDFLoader,
     CSVLoader,
     TextLoader,
-    UnstructuredMarkdownLoader
+    UnstructuredMarkdownLoader,
+    JSONLoader
 )
 from langchain_core.documents import Document
 import bs4
+import json
 
 class DataLoader:
     """
@@ -189,6 +191,65 @@ class DataLoader:
         elif source_type == 'markdown':
             return self.load_markdown_documents(source_paths)
 
+def load_faq_data(file_path: str) -> List[Document]:
+    """
+    Load FAQ data from JSON file and convert to Langchain Documents
+    
+    Args:
+        file_path: Path to the JSON file containing FAQ data
+        
+    Returns:
+        List of Langchain Documents with content and metadata
+    """
+    try:
+        # Load JSON data
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            
+        # Convert to Documents
+        documents = []
+        for item in data:
+            doc = Document(
+                page_content=item['content'],
+                metadata={
+                    'id': item['id'],
+                    'feature_tag': item['meta_data']['feature_tag'],
+                    'methods': item['meta_data']['methods'],
+                    'application_values': item['meta_data']['application_values']
+                }
+            )
+            documents.append(doc)
+            
+        return documents
+        
+    except Exception as e:
+        print(f"Error loading FAQ data: {str(e)}")
+        return []
+
+def preprocess_faq_data(documents: List[Document]) -> List[Document]:
+    """
+    Preprocess FAQ documents by cleaning and normalizing content
+    
+    Args:
+        documents: List of Langchain Documents
+        
+    Returns:
+        List of preprocessed Documents
+    """
+    processed_docs = []
+    for doc in documents:
+        # Clean content
+        content = doc.page_content.strip()
+        
+        # Create new document with cleaned content
+        processed_doc = Document(
+            page_content=content,
+            metadata=doc.metadata
+        )
+        processed_docs.append(processed_doc)
+        
+    return processed_docs
+
 if __name__ == "__main__":
     """
     This part runs when you run this file directly.
@@ -230,3 +291,16 @@ if __name__ == "__main__":
         print(f"Loaded {len(docs)} documents using generic loader")
     except Exception as e:
         print(f"Generic loading test failed: {e}")
+
+    # Test loading and preprocessing
+    test_docs = load_faq_data("../../data/TinhNangApp.json")
+    print(f"Loaded {len(test_docs)} documents")
+    
+    processed_docs = preprocess_faq_data(test_docs)
+    print(f"Processed {len(processed_docs)} documents")
+    
+    # Print sample document
+    if processed_docs:
+        print("\nSample document:")
+        print(f"Content: {processed_docs[0].page_content[:100]}...")
+        print(f"Metadata: {processed_docs[0].metadata}")

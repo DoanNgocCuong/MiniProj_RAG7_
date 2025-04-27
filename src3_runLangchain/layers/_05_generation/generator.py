@@ -13,6 +13,12 @@ import os
 # Load environment variables
 load_dotenv()
 
+# Default system prompt
+DEFAULT_SYSTEM_PROMPT = """You are a helpful assistant that answers questions based on the given context. 
+If you don't know the answer, say you don't know. 
+Use only the information from the context to answer. 
+Keep your answers clear and simple."""
+
 class AnswerGenerator:
     """
     A class that helps generate answers using OpenAI models.
@@ -25,9 +31,10 @@ class AnswerGenerator:
     
     def __init__(
         self,
-        model_name: str = "gpt-3.5-turbo",
+        model_name: str = "gpt-4o-mini",
         temperature: float = 0,
-        max_tokens: int = 8192
+        max_tokens: int = 4096,
+        system_prompt: str = DEFAULT_SYSTEM_PROMPT
     ):
         """
         Start the AnswerGenerator with optional model settings.
@@ -36,6 +43,7 @@ class AnswerGenerator:
             model_name: Name of the OpenAI model to use
             temperature: How creative the answers should be (0.0 to 1.0)
             max_tokens: Maximum number of tokens in the response
+            system_prompt: System prompt to guide the model's behavior
             
         Example:
             >>> generator = AnswerGenerator(model_name="gpt-4")
@@ -56,6 +64,7 @@ class AnswerGenerator:
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.system_prompt = system_prompt
     
     def format_context(self, documents: List[Document]) -> str:
         """
@@ -110,7 +119,7 @@ Answer:"""
         response = self.client.chat.completions.create(
             model=self.model_name,
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that answers questions based on the given context. If you don't know the answer, say you don't know. Use only the information from the context to answer. Keep your answers clear and simple."},
+                {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": prompt}
             ],
             temperature=self.temperature,

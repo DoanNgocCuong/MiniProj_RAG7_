@@ -13,11 +13,8 @@ from layers._03_embedding.embedder import DocumentEmbedder
 from layers._04_retrieval.retriever import DocumentRetriever
 from layers._05_generation.generator import AnswerGenerator
 from layers._06_evaluation.evaluator import RAGEvaluator
-from test_data import TEST_DATA
 
 # Cài đặt thư viện cần thiết
-# pip install langchain langchain-openai langchain-community chromadb rank_bm25 jq
-
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.schema import Document, BaseRetriever
@@ -48,69 +45,93 @@ Tổng điểm: 0-100
 Hãy đưa ra phản hồi chi tiết cho từng tiêu chí."""
 
 @dataclass
-class SearchResult:
-    """Lưu trữ kết quả tìm kiếm với score và document"""
-    document: Document
-    score: float
+class BenchmarkResult:
+    """Lưu trữ kết quả benchmark cho một câu hỏi"""
+    query: str
+    expected_answer: str
+    actual_answer: str
+    evaluation_score: float
+    evaluation_feedback: str
+    relevant_docs: List[Document]
+    processing_time: float
 
-class FeatureInfo(BaseModel):
-    """Lưu trữ thông tin về tính năng"""
-    feature_tag: str
-    methods: List[str]
-    application_values: List[str]
-    content: str
-
-def analyze_features(documents: List[Document]) -> Dict[str, FeatureInfo]:
-    """Phân tích và nhóm các tính năng theo feature_tag"""
-    features = {}
-    for doc in documents:
-        meta = doc.metadata
-        if "feature_tag" in meta:
-            tag = meta["feature_tag"]
-            if tag not in features:
-                features[tag] = FeatureInfo(
-                    feature_tag=tag,
-                    methods=meta.get("methods", []),
-                    application_values=meta.get("application_values", []),
-                    content=doc.page_content
-                )
-            else:
-                # Cập nhật thông tin cho feature đã tồn tại
-                features[tag].content += "\n" + doc.page_content
-                features[tag].methods = list(set(features[tag].methods + meta.get("methods", [])))
-                features[tag].application_values = list(set(features[tag].application_values + meta.get("application_values", [])))
-    return features
-
-def print_feature_analysis(features: Dict[str, FeatureInfo]):
-    """In ra phân tích các tính năng"""
-    print("\n=== PHÂN TÍCH TÍNH NĂNG ===")
-    for tag, info in features.items():
-        print(f"\nTính năng: {tag}")
-        print(f"Phương pháp: {', '.join(info.methods)}")
-        print(f"Giá trị ứng dụng: {', '.join(info.application_values)}")
-        print(f"Nội dung: {info.content[:100]}...")
+def load_benchmark_data(file_path: str) -> List[Dict[str, Any]]:
+    """Đọc dữ liệu benchmark từ file JSON"""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 def create_vectordb(documents: List[Document], persist_directory: str = "data/chroma") -> FAISS:
-    """
-    Create a vector database from documents using OpenAI embeddings
-    
-    Args:
-        documents: List of documents to embed
-        persist_directory: Directory to store the vector database
-        
-    Returns:
-        FAISS vector database instance
-    """
-    # Initialize embeddings
+    """Tạo vector database từ documents"""
     embeddings = OpenAIEmbeddings()
-    
-    # Create vector database
-    vectordb = FAISS.from_documents(
-        documents=documents,
-        embedding=embeddings
-    )
-    
+    vectordb = FAISS.from_documents(documents=documents, embedding=embeddings)
     return vectordb
+
+def run_benchmark(
+    retriever: DocumentRetriever,
+    generator: AnswerGenerator,
+    evaluator: RAGEvaluator,
+    benchmark_data: List[Dict[str, Any]]
+) -> List[BenchmarkResult]:
+    """Chạy benchmark và trả về kết quả"""
+    results = []
+    
+    for item in benchmark_data:
+        query = item["query"]
+        expected_answer = item["expected_answer"]
+        
+        # Đo thời gian xử lý
+        start_time = time.time()
+        
+        # Tìm kiếm tài liệu liên quan
+        relevant_docs = retriever.retrieve_documents(query)
+        
+        # Tạo câu trả lời
+        actual_answer = generator.generate_answer(query, relevant_docs)
+        
+        # Đánh giá câu trả lời
+        evaluation = evaluator.evaluate_answer(query, actual_answer, relevant_docs)
+        
+        # Tính thời gian xử lý
+        processing_time = time.time() - start_time
+        
+        # Lưu kết quả
+        result = BenchmarkResult(
+            query=query,
+            expected_answer=expected_answer,
+            actual_answer=actual_answer,
+            evaluation_score=evaluation["score"],
+            evaluation_feedback=evaluation["feedback"],
+            relevant_docs=relevant_docs,
+            processing_time=processing_time
+        )
+        results.append(result)
+        
+    return results
+
+def print_benchmark_results(results: List[BenchmarkResult]):
+    """In kết quả benchmark"""
+    print("\n=== KẾT QUẢ BENCHMARK ===")
+    
+    # Tính toán các chỉ số tổng hợp
+    total_score = sum(r.evaluation_score for r in results)
+    avg_score = total_score / len(results)
+    total_time = sum(r.processing_time for r in results)
+    avg_time = total_time / len(results)
+    
+    print(f"\nTổng số câu hỏi: {len(results)}")
+    print(f"Điểm trung bình: {avg_score:.2f}/100")
+    print(f"Thời gian trung bình: {avg_time:.2f} giây")
+    
+    # In chi tiết từng câu hỏi
+    print("\n=== CHI TIẾT TỪNG CÂU HỎI ===")
+    for i, result in enumerate(results, 1):
+        print(f"\n{i}. Câu hỏi: {result.query}")
+        print(f"   Câu trả lời mong đợi: {result.expected_answer}")
+        print(f"   Câu trả lời thực tế: {result.actual_answer}")
+        print(f"   Điểm đánh giá: {result.evaluation_score}/100")
+        print(f"   Thời gian xử lý: {result.processing_time:.2f} giây")
+        print(f"   Số tài liệu liên quan: {len(result.relevant_docs)}")
+        print(f"   Phản hồi đánh giá: {result.evaluation_feedback}")
 
 def main():
     # Load environment variables
@@ -135,9 +156,9 @@ def main():
     documents = load_faq_data("data/TinhNangApp.json")
     processed_documents = preprocess_faq_data(documents)
     
-    # Phân tích tính năng
-    features = analyze_features(processed_documents)
-    print_feature_analysis(features)
+    # Load benchmark data
+    print("\n=== ĐANG ĐỌC DỮ LIỆU BENCHMARK ===")
+    benchmark_data = load_benchmark_data("data/benchmark_TinhNangApp.json")
     
     # Embedding Layer
     print("\n=== ĐANG TẠO VECTOR DATABASE ===")
@@ -169,29 +190,12 @@ def main():
         evaluation_prompt=EVALUATION_PROMPT
     )
     
-    # Interactive mode
-    print("\n=== CHẾ ĐỘ TƯƠNG TÁC ===")
-    print("Nhập 'exit' để thoát")
-    while True:
-        query = input("\nCâu hỏi của bạn: ")
-        if query.lower() == 'exit':
-            break
-            
-        # Tìm kiếm tài liệu liên quan
-        relevant_docs = retriever.retrieve_documents(query)
-        print("\nTài liệu liên quan:")
-        for i, doc in enumerate(relevant_docs, 1):
-            print(f"\n{i}. {doc.page_content[:100]}...")
-            
-        # Tạo câu trả lời
-        answer = generator.generate_answer(query, relevant_docs)
-        print("\nCâu trả lời:", answer)
-        
-        # Đánh giá câu trả lời
-        evaluation = evaluator.evaluate_answer(query, answer, relevant_docs)
-        print("\nĐánh giá câu trả lời:")
-        print(f"Điểm: {evaluation['score']}/100")
-        print(f"Phản hồi: {evaluation['feedback']}")
+    # Run benchmark
+    print("\n=== ĐANG CHẠY BENCHMARK ===")
+    results = run_benchmark(retriever, generator, evaluator, benchmark_data)
+    
+    # Print results
+    print_benchmark_results(results)
 
 if __name__ == "__main__":
     main()

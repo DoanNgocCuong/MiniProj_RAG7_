@@ -15,6 +15,13 @@ import os
 # Load environment variables
 load_dotenv()
 
+# Default evaluation prompt
+DEFAULT_EVALUATION_PROMPT = """You are an expert evaluator of RAG systems.
+Check if the answer is correct based on the context.
+Give a score from 0 to 100.
+Explain your score.
+Find any problems or missing information."""
+
 class RAGEvaluator:
     """
     A class that helps check if the RAG system is working well.
@@ -28,8 +35,10 @@ class RAGEvaluator:
     
     def __init__(
         self,
-        model_name: str = "gpt-3.5-turbo",
-        temperature: float = 0.0
+        model_name: str = "gpt-4o-mini",
+        max_tokens: int = 4096,
+        temperature: float = 0.0,
+        evaluation_prompt: str = DEFAULT_EVALUATION_PROMPT
     ):
         """
         Start the RAGEvaluator with optional model settings.
@@ -37,6 +46,7 @@ class RAGEvaluator:
         Args:
             model_name: Name of the AI model to use
             temperature: How creative the evaluations should be (0.0 to 1.0)
+            evaluation_prompt: Prompt to guide the evaluation process
             
         Example:
             >>> evaluator = RAGEvaluator(model_name="gpt-4")
@@ -49,11 +59,7 @@ class RAGEvaluator:
         
         # Create evaluation prompt
         self.eval_prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are an expert evaluator of RAG systems.
-            Check if the answer is correct based on the context.
-            Give a score from 0 to 100.
-            Explain your score.
-            Find any problems or missing information."""),
+            ("system", evaluation_prompt),
             ("human", """Context: {context}
             
             Question: {question}

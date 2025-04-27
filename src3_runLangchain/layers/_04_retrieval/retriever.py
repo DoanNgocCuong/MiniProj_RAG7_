@@ -18,6 +18,15 @@ import os
 # Load environment variables
 load_dotenv()
 
+# Default configuration
+DEFAULT_K = 4
+DEFAULT_HYBRID_WEIGHTS = [0.7, 0.3]  # [vector_weight, keyword_weight]
+DEFAULT_EMBEDDINGS = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2",
+    model_kwargs={'device': 'cpu'},
+    encode_kwargs={'normalize_embeddings': True}
+)
+
 class DocumentRetriever:
     """
     A class that helps find relevant documents based on questions.
@@ -35,7 +44,8 @@ class DocumentRetriever:
         documents: Optional[List[Document]] = None,
         retriever_type: str = "vector",
         embeddings_model: Optional[HuggingFaceEmbeddings] = None,
-        hybrid_weights: List[float] = [0.7, 0.3]  # [vector_weight, keyword_weight]
+        hybrid_weights: List[float] = DEFAULT_HYBRID_WEIGHTS,
+        k: int = DEFAULT_K
     ):
         """
         Start the DocumentRetriever with optional vector store and documents.
@@ -46,6 +56,7 @@ class DocumentRetriever:
             retriever_type: Type of retriever to use ('vector', 'bm25', 'hybrid', 'compression')
             embeddings_model: Optional HuggingFace embeddings model
             hybrid_weights: Weights for hybrid search [vector_weight, keyword_weight]
+            k: Number of documents to return
             
         Example:
             >>> from langchain_community.vectorstores import FAISS
@@ -56,72 +67,66 @@ class DocumentRetriever:
         self.documents = documents
         self.retriever_type = retriever_type
         self.hybrid_weights = hybrid_weights
-        
-        # Initialize HuggingFaceEmbeddings with a small, fast model
-        if embeddings_model is None:
-            self.embeddings_model = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-MiniLM-L6-v2",
-                model_kwargs={'device': 'cpu'},
-                encode_kwargs={'normalize_embeddings': True}
-            )
-        else:
-            self.embeddings_model = embeddings_model
-            
+        self.k = k
+        self.embeddings_model = embeddings_model or DEFAULT_EMBEDDINGS
         self.retriever = None
         
         # Initialize the retriever based on type
         self._initialize_retriever()
     
+    def _create_vector_retriever(self) -> VectorStore:
+        """Create a vector retriever from the vector store."""
+        return self.vector_store.as_retriever(
+            search_type="similarity",
+            search_kwargs={"k": self.k}
+        )
+    
+    def _create_bm25_retriever(self) -> BM25Retriever:
+        """Create a BM25 retriever from documents."""
+        retriever = BM25Retriever.from_documents(self.documents)
+        retriever.k = self.k
+        return retriever
+    
+    def _create_hybrid_retriever(self) -> EnsembleRetriever:
+        """Create a hybrid retriever combining vector and keyword search."""
+        vector_retriever = self._create_vector_retriever()
+        bm25_retriever = self._create_bm25_retriever()
+        
+        return EnsembleRetriever(
+            retrievers=[vector_retriever, bm25_retriever],
+            weights=self.hybrid_weights
+        )
+    
+    def _create_compression_retriever(self) -> ContextualCompressionRetriever:
+        """Create a compression retriever with LLM-based document compression."""
+        try:
+            llm = ChatOpenAI(
+                model="gpt-3.5-turbo",
+                temperature=0.0,
+                api_key=os.getenv("OPENAI_API_KEY")
+            )
+            compressor = LLMChainExtractor.from_llm(llm)
+            vector_retriever = self._create_vector_retriever()
+            
+            return ContextualCompressionRetriever(
+                base_compressor=compressor,
+                base_retriever=vector_retriever
+            )
+        except Exception as e:
+            print(f"Warning: Could not initialize compression retriever: {e}")
+            print("Falling back to vector retriever")
+            return self._create_vector_retriever()
+    
     def _initialize_retriever(self):
         """Set up the retriever based on the chosen type."""
         if self.retriever_type == "vector" and self.vector_store:
-            self.retriever = self.vector_store.as_retriever(
-                search_type="similarity",
-                search_kwargs={"k": 4}
-            )
+            self.retriever = self._create_vector_retriever()
         elif self.retriever_type == "bm25" and self.documents:
-            self.retriever = BM25Retriever.from_documents(self.documents)
-            self.retriever.k = 4
+            self.retriever = self._create_bm25_retriever()
         elif self.retriever_type == "hybrid" and self.vector_store and self.documents:
-            # Create vector retriever
-            vector_retriever = self.vector_store.as_retriever(
-                search_type="similarity",
-                search_kwargs={"k": 4}
-            )
-            
-            # Create BM25 retriever
-            bm25_retriever = BM25Retriever.from_documents(self.documents)
-            bm25_retriever.k = 4
-            
-            # Create hybrid retriever
-            self.retriever = EnsembleRetriever(
-                retrievers=[vector_retriever, bm25_retriever],
-                weights=self.hybrid_weights
-            )
+            self.retriever = self._create_hybrid_retriever()
         elif self.retriever_type == "compression" and self.vector_store:
-            try:
-                # Initialize ChatOpenAI with minimal configuration
-                llm = ChatOpenAI(
-                    model="gpt-3.5-turbo",
-                    temperature=0.0,
-                    api_key=os.getenv("OPENAI_API_KEY")
-                )
-                compressor = LLMChainExtractor.from_llm(llm)
-                vector_retriever = self.vector_store.as_retriever(
-                    search_type="similarity",
-                    search_kwargs={"k": 4}
-                )
-                self.retriever = ContextualCompressionRetriever(
-                    base_compressor=compressor,
-                    base_retriever=vector_retriever
-                )
-            except Exception as e:
-                print(f"Warning: Could not initialize compression retriever: {e}")
-                print("Falling back to vector retriever")
-                self.retriever = self.vector_store.as_retriever(
-                    search_type="similarity",
-                    search_kwargs={"k": 4}
-                )
+            self.retriever = self._create_compression_retriever()
         else:
             raise ValueError(
                 "Invalid retriever configuration. Please provide necessary components."
@@ -191,15 +196,8 @@ if __name__ == "__main__":
         )
     ]
     
-    # Initialize embeddings
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
-        model_kwargs={'device': 'cpu'},
-        encode_kwargs={'normalize_embeddings': True}
-    )
-    
     # Create vector store
-    vector_store = FAISS.from_documents(sample_docs, embeddings)
+    vector_store = FAISS.from_documents(sample_docs, DEFAULT_EMBEDDINGS)
     
     # Test vector retriever
     print("\nTesting vector retriever...")
@@ -231,8 +229,7 @@ if __name__ == "__main__":
         retriever = DocumentRetriever(
             vector_store=vector_store,
             documents=sample_docs,
-            retriever_type="hybrid",
-            hybrid_weights=[0.7, 0.3]  # 70% vector, 30% keyword
+            retriever_type="hybrid"
         )
         docs = retriever.retrieve_documents("What is RAG?")
         print(f"Found {len(docs)} relevant documents using hybrid search")

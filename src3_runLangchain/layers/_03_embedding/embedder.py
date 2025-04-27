@@ -14,6 +14,7 @@ import numpy as np
 from dotenv import load_dotenv
 import os
 import sys
+from langchain_openai import OpenAIEmbeddings
 
 # Load environment variables from .env file
 load_dotenv()
@@ -336,6 +337,32 @@ class DocumentEmbedder:
             
         return self.vector_store
 
+def create_vectordb(documents: List[Document], persist_directory: str = "data/chroma") -> Chroma:
+    """
+    Create a vector database from documents using OpenAI embeddings
+    
+    Args:
+        documents: List of documents to embed
+        persist_directory: Directory to store the vector database
+        
+    Returns:
+        Chroma vector database instance
+    """
+    # Initialize embeddings
+    embeddings = OpenAIEmbeddings()
+    
+    # Create vector database
+    vectordb = Chroma.from_documents(
+        documents=documents,
+        embedding=embeddings,
+        persist_directory=persist_directory
+    )
+    
+    # Persist the database
+    vectordb.persist()
+    
+    return vectordb
+
 if __name__ == "__main__":
     """
     This part runs when you run this file directly.
@@ -394,5 +421,24 @@ if __name__ == "__main__":
         print(f"Found {len(results)} similar documents using Milvus")
     except Exception as e:
         print(f"Milvus test failed: {e}")
+        
+    # Test vector database creation
+    from layers._01_data_ingestion.loader import load_faq_data, preprocess_faq_data
+    
+    # Load and preprocess documents
+    documents = load_faq_data("../../data/TinhNangApp.json")
+    processed_docs = preprocess_faq_data(documents)
+    
+    # Create vector database
+    print("Creating vector database...")
+    vectordb = create_vectordb(processed_docs)
+    print(f"Vector database created with {len(documents)} documents")
+    
+    # Test similarity search
+    query = "What are the main features of the app?"
+    results = vectordb.similarity_search(query, k=3)
+    print("\nSimilarity search results:")
+    for i, doc in enumerate(results, 1):
+        print(f"\n{i}. {doc.page_content[:100]}...")
         
 
