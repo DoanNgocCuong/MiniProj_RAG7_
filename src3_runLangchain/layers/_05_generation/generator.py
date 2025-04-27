@@ -26,8 +26,8 @@ class AnswerGenerator:
     def __init__(
         self,
         model_name: str = "gpt-3.5-turbo",
-        temperature: float = 0.7,
-        max_tokens: int = 10000
+        temperature: float = 0,
+        max_tokens: int = 8192
     ):
         """
         Start the AnswerGenerator with optional model settings.
