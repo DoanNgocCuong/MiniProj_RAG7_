@@ -1,137 +1,398 @@
-from typing import List, Optional
-from langchain.schema import Document
-from langchain_community.vectorstores import Chroma
-import os
-import logging
-import sys
+"""
+This module helps convert text into numbers (vectors) and store them.
+This makes it easy to find similar texts quickly.
+"""
+
+from typing import List, Optional, Dict, Any, Union
+from langchain_core.documents import Document
+from langchain_core.vectorstores import VectorStore
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS, Qdrant, Milvus, Chroma
+from qdrant_client import QdrantClient
+from pymilvus import connections, Collection, CollectionSchema, FieldSchema, DataType
+import numpy as np
 from dotenv import load_dotenv
-import openai
+import os
+import sys
 
-# Add parent directory to path to import other modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from layers._01_data_ingestion.loader import load_and_preprocess_faq_data
-from layers._02_chunking.chunker import Chunking
+# Load environment variables from .env file
+load_dotenv()
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-class CustomEmbeddings:
-    """Custom embeddings class using direct openai.embeddings"""
-    def __init__(self, model: str = "text-embedding-ada-002"):
-        self.model = model
-        # Set API key directly
-        openai.api_key = os.getenv("OPENAI_API_KEY")
+def check_dependencies():
+    """Check if required dependencies are installed."""
+    try:
+        import faiss
+    except ImportError:
+        print("FAISS is not installed. Please install it with:")
+        print("pip install faiss-cpu")
+        sys.exit(1)
         
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Embed a list of documents"""
-        try:
-            response = openai.embeddings.create(
-                model=self.model,
-                input=texts
-            )
-            return [embedding.embedding for embedding in response.data]
-        except Exception as e:
-            logger.error(f"Error embedding documents: {str(e)}")
-            raise
+    try:
+        import qdrant_client
+    except ImportError:
+        print("Qdrant client is not installed. Please install it with:")
+        print("pip install qdrant-client")
+        sys.exit(1)
+        
+    try:
+        import pymilvus
+    except ImportError:
+        print("PyMilvus is not installed. Please install it with:")
+        print("pip install pymilvus")
+        sys.exit(1)
+        
+    # try:
+    #     import chromadb
+    # except ImportError:
+    #     print("ChromaDB is not installed. Please install it with:")
+    #     print("pip install chromadb")
+    #     sys.exit(1)
+
+class DocumentEmbedder:
+    """
+    A class that helps convert text into numbers and store them.
+    
+    This class can:
+    - Convert text into numbers (vectors)
+    - Store vectors in different ways
+    - Find similar texts quickly
+    
+    It supports different ways to store vectors:
+    - FAISS (fast search)
+    - Qdrant (powerful vector database)
+    - Milvus (scalable vector database)
+    - Chroma (simple and fast)
+    """
+    
+    def __init__(
+        self,
+        embeddings_model: Optional[HuggingFaceEmbeddings] = None,
+        vector_store_type: str = "faiss"
+    ):
+        """
+        Start the DocumentEmbedder with optional AI model and storage type.
+        
+        Args:
+            embeddings_model: Optional AI model for converting text to numbers
+            vector_store_type: How to store vectors ('faiss', 'qdrant', 'milvus', 'chroma')
             
-    def embed_query(self, text: str) -> List[float]:
-        """Embed a single query"""
-        try:
-            response = openai.embeddings.create(
-                model=self.model,
-                input=[text]
+        Example:
+            >>> from langchain_community.embeddings import HuggingFaceEmbeddings
+            >>> embeddings = HuggingFaceEmbeddings()
+            >>> embedder = DocumentEmbedder(embeddings_model=embeddings)
+        """
+        # Check dependencies
+        check_dependencies()
+        
+        # Initialize HuggingFaceEmbeddings with a small, fast model
+        if embeddings_model is None:
+            self.embeddings_model = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2",
+                model_kwargs={'device': 'cpu'},
+                encode_kwargs={'normalize_embeddings': True}
             )
-            return response.data[0].embedding
-        except Exception as e:
-            logger.error(f"Error embedding query: {str(e)}")
-            raise
+        else:
+            self.embeddings_model = embeddings_model
+            
+        self.vector_store_type = vector_store_type
+        self.vector_store = None
 
-class Embedder:
-    def __init__(self, model_name: str = "text-embedding-ada-002"):
-        """Initialize the embedder with specified model"""
-        self.model_name = model_name
-        self.embeddings = None
-        self._validate_environment()
+    def create_vector_store(
+        self,
+        documents: List[Document],
+        persist_directory: Optional[str] = None
+    ) -> VectorStore:
+        """
+        Convert documents into vectors and store them.
         
-    def _validate_environment(self):
-        """Validate that required environment variables are set"""
-        load_dotenv()
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is not set")
-        logger.info("OpenAI API key found in environment")
-        
-    def create_embeddings(self) -> CustomEmbeddings:
-        """Create and return embeddings instance"""
+        Args:
+            documents: List of documents to convert
+            persist_directory: Where to save the vectors (optional)
+            
+        Returns:
+            A store containing the document vectors
+            
+        Example:
+            >>> store = embedder.create_vector_store(documents)
+            >>> print(f"Created store with {len(documents)} documents")
+        """
         try:
-            logger.info(f"Initializing embeddings with model: {self.model_name}")
-            self.embeddings = CustomEmbeddings(model=self.model_name)
-            logger.info("Embeddings initialized successfully")
-            return self.embeddings
-        except Exception as e:
-            logger.error(f"Error creating embeddings: {str(e)}")
-            raise
-
-    def create_vector_db(self, documents: List[Document], persist_directory: str = "./chroma_db") -> Chroma:
-        """Create vector database from documents"""
-        try:
-            if not self.embeddings:
-                self.create_embeddings()
+            if self.vector_store_type == "faiss":
+                self.vector_store = FAISS.from_documents(
+                    documents=documents,
+                    embedding=self.embeddings_model
+                )
+                if persist_directory:
+                    self.vector_store.save_local(persist_directory)
+                    
+            elif self.vector_store_type == "qdrant":
+                if not persist_directory:
+                    persist_directory = "./qdrant_data"
+                    
+                # Create directory if it doesn't exist
+                os.makedirs(persist_directory, exist_ok=True)
                 
-            logger.info(f"Creating vector database with {len(documents)} documents")
-            
-            # Create Chroma database
-            vectordb = Chroma.from_documents(
-                documents=documents,
-                embedding=self.embeddings,
-                persist_directory=persist_directory
-            )
-            
-            logger.info(f"Vector database created successfully at {persist_directory}")
-            return vectordb
+                client = QdrantClient(path=persist_directory)
+                self.vector_store = Qdrant.from_documents(
+                    documents=documents,
+                    embedding=self.embeddings_model,
+                    client=client,
+                    collection_name="documents"
+                )
+                
+            elif self.vector_store_type == "milvus":
+                if not persist_directory:
+                    persist_directory = "documents"
+                
+                try:
+                    # Connect to Milvus
+                    connections.connect(host="localhost", port="19530")
+                except Exception as e:
+                    raise RuntimeError(
+                        "Could not connect to Milvus server. "
+                        "Please make sure Milvus is running on localhost:19530. "
+                        f"Error: {str(e)}"
+                    )
+                
+                # Create collection if it doesn't exist
+                if not Collection(persist_directory).exists():
+                    # Define schema
+                    dim = 384  # MiniLM-L6-v2 embedding dimension
+                    fields = [
+                        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
+                        FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=dim),
+                        FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=65535),
+                        FieldSchema(name="metadata", dtype=DataType.JSON)
+                    ]
+                    schema = CollectionSchema(fields=fields)
+                    Collection(name=persist_directory, schema=schema)
+                
+                self.vector_store = Milvus.from_documents(
+                    documents=documents,
+                    embedding=self.embeddings_model,
+                    collection_name=persist_directory
+                )
+                
+            elif self.vector_store_type == "chroma":
+                if not persist_directory:
+                    persist_directory = "./chroma_data"
+                    
+                # Create directory if it doesn't exist
+                os.makedirs(persist_directory, exist_ok=True)
+                
+                self.vector_store = Chroma.from_documents(
+                    documents=documents,
+                    embedding=self.embeddings_model,
+                    persist_directory=persist_directory
+                )
+                
+            else:
+                raise ValueError(f"Unknown vector store type: {self.vector_store_type}")
+                
+            return self.vector_store
             
         except Exception as e:
-            logger.error(f"Error creating vector database: {str(e)}")
-            raise
+            raise RuntimeError(
+                f"Failed to create vector store. Error: {str(e)}\n"
+                "Please check that all required services are running and dependencies are installed."
+            )
+
+    def add_documents(self, documents: List[Document]) -> None:
+        """
+        Add new documents to the vector store.
+        
+        Args:
+            documents: List of new documents to add
+            
+        Example:
+            >>> embedder.add_documents(new_documents)
+            >>> print("Added new documents to store")
+        """
+        if self.vector_store is None:
+            raise ValueError("Vector store not created yet")
+            
+        self.vector_store.add_documents(documents)
+
+    def similarity_search(
+        self,
+        query: str,
+        k: int = 4
+    ) -> List[Document]:
+        """
+        Find documents similar to the query.
+        
+        Args:
+            query: Text to find similar documents for
+            k: How many similar documents to find
+            
+        Returns:
+            List of similar documents
+            
+        Example:
+            >>> similar_docs = embedder.similarity_search("What is RAG?")
+            >>> print(f"Found {len(similar_docs)} similar documents")
+        """
+        if self.vector_store is None:
+            raise ValueError("Vector store not created yet")
+            
+        return self.vector_store.similarity_search(query, k=k)
+
+    def similarity_search_with_score(
+        self,
+        query: str,
+        k: int = 4
+    ) -> List[tuple[Document, float]]:
+        """
+        Find similar documents with their similarity scores.
+        
+        Args:
+            query: Text to find similar documents for
+            k: How many similar documents to find
+            
+        Returns:
+            List of (document, score) pairs
+            
+        Example:
+            >>> results = embedder.similarity_search_with_score("What is RAG?")
+            >>> for doc, score in results:
+            >>>     print(f"Score: {score:.2f}")
+            >>>     print(doc.page_content)
+        """
+        if self.vector_store is None:
+            raise ValueError("Vector store not created yet")
+            
+        return self.vector_store.similarity_search_with_score(query, k=k)
+
+    def save_vector_store(self, persist_directory: str) -> None:
+        """
+        Save the vector store to disk.
+        
+        Args:
+            persist_directory: Where to save the store
+            
+        Example:
+            >>> embedder.save_vector_store("./my_store")
+            >>> print("Saved vector store to disk")
+        """
+        if self.vector_store is None:
+            raise ValueError("Vector store not created yet")
+            
+        if self.vector_store_type == "faiss":
+            self.vector_store.save_local(persist_directory)
+        elif self.vector_store_type == "qdrant":
+            self.vector_store.client.persist(persist_directory)
+        elif self.vector_store_type == "milvus":
+            # Milvus handles persistence automatically
+            pass
+        elif self.vector_store_type == "chroma":
+            self.vector_store.persist()
+
+    def load_vector_store(
+        self,
+        persist_directory: str,
+        vector_store_type: Optional[str] = None
+    ) -> VectorStore:
+        """
+        Load a vector store from disk.
+        
+        Args:
+            persist_directory: Where the store is saved
+            vector_store_type: How the store was saved (optional)
+            
+        Returns:
+            The loaded vector store
+            
+        Example:
+            >>> store = embedder.load_vector_store("./my_store")
+            >>> print("Loaded vector store from disk")
+        """
+        store_type = vector_store_type or self.vector_store_type
+        
+        if store_type == "faiss":
+            self.vector_store = FAISS.load_local(
+                persist_directory,
+                self.embeddings_model
+            )
+        elif store_type == "qdrant":
+            client = QdrantClient(path=persist_directory)
+            self.vector_store = Qdrant(
+                client=client,
+                collection_name="documents",
+                embedding_function=self.embeddings_model.embed_query
+            )
+        elif store_type == "milvus":
+            connections.connect(host="localhost", port="19530")
+            self.vector_store = Milvus(
+                collection_name=persist_directory,
+                embedding_function=self.embeddings_model.embed_query
+            )
+        elif store_type == "chroma":
+            self.vector_store = Chroma(
+                persist_directory=persist_directory,
+                embedding_function=self.embeddings_model
+            )
+        else:
+            raise ValueError(f"Unknown vector store type: {store_type}")
+            
+        return self.vector_store
 
 if __name__ == "__main__":
-    print("Testing Embedding functionality...")
+    """
+    This part runs when you run this file directly.
+    It shows examples of how to use the DocumentEmbedder class.
+    """
+    from langchain_core.documents import Document
     
+    # Create sample documents
+    sample_docs = [
+        Document(
+            page_content="This is a sample document about RAG architecture.",
+            metadata={"source": "test1"}
+        ),
+        Document(
+            page_content="Another document explaining vector databases.",
+            metadata={"source": "test2"}
+        )
+    ]
+    
+    # # Test Chroma vector store
+    # print("\nTesting Chroma vector store...")
+    # try:
+    #     embedder = DocumentEmbedder(vector_store_type="chroma")
+    #     store = embedder.create_vector_store(sample_docs)
+    #     results = embedder.similarity_search("What is RAG?")
+    #     print(f"Found {len(results)} similar documents using Chroma")
+    # except Exception as e:
+    #     print(f"Chroma test failed: {e}")
+        
+    # Test FAISS vector store
+    print("Testing FAISS vector store...")
     try:
-        # Load and preprocess data
-        print("\nLoading and preprocessing data...")
-        documents = load_and_preprocess_faq_data()
-        print(f"Loaded {len(documents)} documents")
-        
-        # Chunk documents
-        print("\nChunking documents...")
-        chunker = Chunking(chunk_size=500, chunk_overlap=100)
-        chunked_docs = chunker.chunk_documents(documents)
-        print(f"Created {len(chunked_docs)} chunks")
-        
-        # Initialize embedder
-        print("\nInitializing embedder...")
-        embedder = Embedder()
-        
-        # Create vector database
-        print("\nCreating vector database...")
-        vectordb = embedder.create_vector_db(chunked_docs)
-        
-        # Test similarity search
-        print("\nTesting similarity search...")
-        query = "What are the main features of the app?"
-        results = vectordb.similarity_search(query, k=3)
-        
-        print(f"\nSearch results for query: '{query}'")
-        for i, doc in enumerate(results):
-            print(f"\nResult {i+1}:")
-            print(f"Content: {doc.page_content}")
-            print(f"Metadata: {doc.metadata}")
-            
+        embedder = DocumentEmbedder(vector_store_type="faiss")
+        store = embedder.create_vector_store(sample_docs)
+        results = embedder.similarity_search("What is RAG?")
+        print(f"Found {len(results)} similar documents using FAISS")
     except Exception as e:
-        logger.error(f"Error during testing: {str(e)}")
-        raise
+        print(f"FAISS test failed: {e}")
+    
+    # Test Qdrant vector store
+    print("\nTesting Qdrant vector store...")
+    try:
+        embedder = DocumentEmbedder(vector_store_type="qdrant")
+        store = embedder.create_vector_store(sample_docs)
+        results = embedder.similarity_search("What is RAG?")
+        print(f"Found {len(results)} similar documents using Qdrant")
+    except Exception as e:
+        print(f"Qdrant test failed: {e}")
+    
+    # Test Milvus vector store
+    print("\nTesting Milvus vector store...")
+    try:
+        embedder = DocumentEmbedder(vector_store_type="milvus")
+        store = embedder.create_vector_store(sample_docs)
+        results = embedder.similarity_search("What is RAG?")
+        print(f"Found {len(results)} similar documents using Milvus")
+    except Exception as e:
+        print(f"Milvus test failed: {e}")
+        
+

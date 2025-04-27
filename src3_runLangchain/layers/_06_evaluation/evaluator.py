@@ -1,115 +1,295 @@
-import time
-from typing import List, Dict, Any
-from sklearn.metrics import precision_recall_fscore_support
-from langchain.chains import RetrievalQA
+"""
+This module helps check if the RAG system is working well.
+It can measure how good the answers are and find problems.
+"""
 
-def evaluate_qa_system(qa_chain: RetrievalQA, test_data: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Evaluate QA system performance"""
-    results = []
-    correct_predictions = 0
-    total_queries = len(test_data)
-    total_time = 0
+from typing import List, Dict, Any, Optional
+from langchain_core.documents import Document
+from langchain_openai import ChatOpenAI
+from langchain.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
+
+class RAGEvaluator:
+    """
+    A class that helps check if the RAG system is working well.
     
-    # Store actual and predicted for metrics calculation
-    actual_ids = []
-    predicted_ids = []
+    This class can:
+    - Check if answers are correct
+    - Find missing information
+    - Measure answer quality
+    - Find system problems
+    """
     
-    for i, test_case in enumerate(test_data, 1):
-        query = test_case["query"]
-        expected_id = test_case["expected_answer_id"]
-        expected_answer = test_case["expected_answer"]
+    def __init__(
+        self,
+        model_name: str = "gpt-3.5-turbo",
+        temperature: float = 0.0
+    ):
+        """
+        Start the RAGEvaluator with optional model settings.
         
-        # Time the response
-        start_time = time.time()
-        response = qa_chain.invoke({"query": query})
-        end_time = time.time()
-        
-        # Get the response and source documents
-        answer = response['result']
-        source_docs = response.get('source_documents', [])
-        
-        # Get the ID of the first retrieved document
-        if source_docs:
-            predicted_id = source_docs[0].metadata.get('id')
-        else:
-            predicted_id = None
+        Args:
+            model_name: Name of the AI model to use
+            temperature: How creative the evaluations should be (0.0 to 1.0)
             
-        # Calculate timing
-        response_time = end_time - start_time
-        total_time += response_time
+        Example:
+            >>> evaluator = RAGEvaluator(model_name="gpt-4")
+            >>> score = evaluator.evaluate_answer("What is RAG?", answer, documents)
+        """
+        self.llm = ChatOpenAI(
+            model_name=model_name,
+            temperature=temperature
+        )
         
-        # Check if the prediction is correct
-        is_correct = predicted_id == expected_id
-        if is_correct:
-            correct_predictions += 1
+        # Create evaluation prompt
+        self.eval_prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are an expert evaluator of RAG systems.
+            Check if the answer is correct based on the context.
+            Give a score from 0 to 100.
+            Explain your score.
+            Find any problems or missing information."""),
+            ("human", """Context: {context}
             
-        # Store for metrics calculation
-        actual_ids.append(expected_id)
-        predicted_ids.append(predicted_id if predicted_id is not None else -1)
+            Question: {question}
+            
+            Answer: {answer}
+            
+            Evaluation:""")
+        ])
         
-        # Store detailed results
-        result = {
-            "query": query,
-            "expected_id": expected_id,
-            "predicted_id": predicted_id,
-            "expected_answer": expected_answer,
-            "actual_answer": answer,
-            "is_correct": is_correct,
-            "response_time": response_time
+        # Create the chain
+        self.chain = (
+            {
+                "context": RunnablePassthrough(),
+                "question": RunnablePassthrough(),
+                "answer": RunnablePassthrough()
+            }
+            | self.eval_prompt
+            | self.llm
+            | StrOutputParser()
+        )
+    
+    def evaluate_answer(
+        self,
+        question: str,
+        answer: str,
+        documents: List[Document]
+    ) -> Dict[str, Any]:
+        """
+        Check if an answer is good.
+        
+        Args:
+            question: The original question
+            answer: The generated answer
+            documents: List of relevant documents
+            
+        Returns:
+            Dictionary with evaluation results
+            
+        Example:
+            >>> result = evaluator.evaluate_answer("What is RAG?", answer, documents)
+            >>> print(f"Score: {result['score']}")
+            >>> print(f"Feedback: {result['feedback']}")
+        """
+        context = "\n\n".join(doc.page_content for doc in documents)
+        
+        evaluation = self.chain.invoke({
+            "context": context,
+            "question": question,
+            "answer": answer
+        })
+        
+        # Try to extract score from evaluation text
+        score = 0
+        for line in evaluation.split("\n"):
+            if "score" in line.lower():
+                try:
+                    score = int(line.split(":")[-1].strip())
+                    break
+                except:
+                    continue
+                    
+        return {
+            "score": score,
+            "feedback": evaluation,
+            "context": context
         }
-        results.append(result)
+    
+    def find_missing_information(
+        self,
+        question: str,
+        answer: str,
+        documents: List[Document]
+    ) -> List[str]:
+        """
+        Find information that should be in the answer but is missing.
         
-        # Print progress
-        print(f"\nProcessing query {i}/{total_queries}")
-        print(f"Query: {query}")
-        print(f"Expected Answer: {expected_answer}")
-        print(f"Actual Answer: {answer}")
-        print(f"Correct: {is_correct}")
-        print(f"Response Time: {response_time:.2f}s")
-        print("-" * 80)
+        Args:
+            question: The original question
+            answer: The generated answer
+            documents: List of relevant documents
+            
+        Returns:
+            List of missing information points
+            
+        Example:
+            >>> missing = evaluator.find_missing_information("What is RAG?", answer, documents)
+            >>> print(f"Missing information: {missing}")
+        """
+        context = "\n\n".join(doc.page_content for doc in documents)
+        
+        # Create prompt for finding missing information
+        missing_prompt = ChatPromptTemplate.from_messages([
+            ("system", """Find information in the context that should be in the answer but is missing.
+            List each missing point on a new line.
+            Be specific and clear."""),
+            ("human", """Context: {context}
+            
+            Question: {question}
+            
+            Answer: {answer}
+            
+            Missing information:""")
+        ])
+        
+        chain = (
+            {
+                "context": RunnablePassthrough(),
+                "question": RunnablePassthrough(),
+                "answer": RunnablePassthrough()
+            }
+            | missing_prompt
+            | self.llm
+            | StrOutputParser()
+        )
+        
+        missing_info = chain.invoke({
+            "context": context,
+            "question": question,
+            "answer": answer
+        })
+        
+        return [line.strip() for line in missing_info.split("\n") if line.strip()]
     
-    # Calculate metrics
-    accuracy = correct_predictions / total_queries
-    precision, recall, f1, _ = precision_recall_fscore_support(
-        actual_ids, 
-        predicted_ids, 
-        average='weighted',
-        zero_division=0
-    )
-    avg_response_time = total_time / total_queries
-    
-    metrics = {
-        "total_queries": total_queries,
-        "correct_predictions": correct_predictions,
-        "accuracy": accuracy,
-        "precision": precision,
-        "recall": recall,
-        "f1_score": f1,
-        "average_response_time": avg_response_time,
-        "detailed_results": results
-    }
-    
-    return metrics
+    def evaluate_retrieval(
+        self,
+        question: str,
+        documents: List[Document]
+    ) -> Dict[str, Any]:
+        """
+        Check if the right documents were found.
+        
+        Args:
+            question: The original question
+            documents: List of retrieved documents
+            
+        Returns:
+            Dictionary with retrieval evaluation results
+            
+        Example:
+            >>> result = evaluator.evaluate_retrieval("What is RAG?", documents)
+            >>> print(f"Relevance score: {result['relevance_score']}")
+            >>> print(f"Feedback: {result['feedback']}")
+        """
+        context = "\n\n".join(doc.page_content for doc in documents)
+        
+        # Create prompt for evaluating retrieval
+        retrieval_prompt = ChatPromptTemplate.from_messages([
+            ("system", """Check if these documents are relevant to the question.
+            Give a score from 0 to 100.
+            Explain your score.
+            Find any irrelevant or missing documents."""),
+            ("human", """Question: {question}
+            
+            Retrieved documents: {context}
+            
+            Evaluation:""")
+        ])
+        
+        chain = (
+            {
+                "context": RunnablePassthrough(),
+                "question": RunnablePassthrough()
+            }
+            | retrieval_prompt
+            | self.llm
+            | StrOutputParser()
+        )
+        
+        evaluation = chain.invoke({
+            "context": context,
+            "question": question
+        })
+        
+        # Try to extract score from evaluation text
+        score = 0
+        for line in evaluation.split("\n"):
+            if "score" in line.lower():
+                try:
+                    score = int(line.split(":")[-1].strip())
+                    break
+                except:
+                    continue
+                    
+        return {
+            "relevance_score": score,
+            "feedback": evaluation,
+            "retrieved_docs": len(documents)
+        }
 
-def print_evaluation_results(metrics: Dict[str, Any]):
-    """Print evaluation results in a formatted way"""
-    print("\n" + "="*50)
-    print("EVALUATION RESULTS")
-    print("="*50)
-    print(f"Total Queries: {metrics['total_queries']}")
-    print(f"Correct Predictions: {metrics['correct_predictions']}")
-    print(f"Accuracy: {metrics['accuracy']:.2%}")
-    print(f"Precision: {metrics['precision']:.2%}")
-    print(f"Recall: {metrics['recall']:.2%}")
-    print(f"F1 Score: {metrics['f1_score']:.2%}")
-    print(f"Average Response Time: {metrics['average_response_time']:.2f}s")
-    print("\nDetailed Results:")
-    print("-"*50)
+if __name__ == "__main__":
+    """
+    This part runs when you run this file directly.
+    It shows examples of how to use the RAGEvaluator class.
+    """
+    from langchain_core.documents import Document
     
-    for result in metrics['detailed_results']:
-        print(f"\nQuery: {result['query']}")
-        print(f"Expected ID: {result['expected_id']}")
-        print(f"Predicted ID: {result['predicted_id']}")
-        print(f"Correct: {result['is_correct']}")
-        print(f"Response Time: {result['response_time']:.2f}s")
-        print("-"*30) 
+    # Create sample documents
+    sample_docs = [
+        Document(
+            page_content="RAG stands for Retrieval-Augmented Generation. It combines retrieval of relevant documents with language model generation.",
+            metadata={"source": "test1"}
+        ),
+        Document(
+            page_content="RAG helps language models provide more accurate and up-to-date answers by using external knowledge.",
+            metadata={"source": "test2"}
+        )
+    ]
+    
+    # Create sample answer
+    sample_answer = "RAG is a system that helps AI models give better answers by using information from documents."
+    
+    # Test answer evaluation
+    print("\nTesting answer evaluation...")
+    try:
+        evaluator = RAGEvaluator()
+        result = evaluator.evaluate_answer("What is RAG?", sample_answer, sample_docs)
+        print(f"Score: {result['score']}")
+        print(f"Feedback: {result['feedback']}")
+    except Exception as e:
+        print(f"Answer evaluation test failed: {e}")
+    
+    # Test missing information
+    print("\nTesting missing information...")
+    try:
+        missing = evaluator.find_missing_information("What is RAG?", sample_answer, sample_docs)
+        print("Missing information:")
+        for item in missing:
+            print(f"- {item}")
+    except Exception as e:
+        print(f"Missing information test failed: {e}")
+    
+    # Test retrieval evaluation
+    print("\nTesting retrieval evaluation...")
+    try:
+        result = evaluator.evaluate_retrieval("What is RAG?", sample_docs)
+        print(f"Relevance score: {result['relevance_score']}")
+        print(f"Feedback: {result['feedback']}")
+    except Exception as e:
+        print(f"Retrieval evaluation test failed: {e}")
