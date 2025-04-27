@@ -1,0 +1,18 @@
+retriever:
+  type: dense
+  model_path: intfloat/e5-base-v2
+  top_k: 3
+
+flashrag:
+  num_queries: 3
+  use_reranking: true
+  reranking_model: cross-encoder/ms-marco-MiniLM-L-6-v2
+
+generator:
+  model_name: gpt-3.5-turbo
+  temperature: 0.7
+  max_tokens: 512
+
+prompt:
+  system: "You are a helpful assistant that answers questions based on the provided context."
+  user: "Context: {context}\n\nQuestion: {question}\n\nAnswer:" 

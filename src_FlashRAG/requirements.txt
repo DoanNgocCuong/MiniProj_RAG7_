@@ -1,0 +1,9 @@
+flashrag-dev
+pypdf2
+pdfplumber
+torch
+transformers
+sentence-transformers
+faiss-cpu==1.8.0
+python-dotenv
+openai 
