@@ -1,10 +1,31 @@
-langchain==0.1.12
-langchain-openai==0.0.8
-langchain-community>=0.0.28,<0.1
-chromadb==0.4.24
-rank-bm25==0.2.2
-python-dotenv==1.0.1
-scikit-learn==1.4.1.post1
-pydantic==2.6.3
-openai==1.12.0
-jq==1.7.0 
+# Cài đặt các thư viện cơ bản
+pip install python-dotenv==1.0.1
+pip install numpy>=1.24.0
+pip install pandas>=2.0.0
+pip install scipy>=1.6.0
+pip install scikit-learn==1.4.1.post1
+pip install joblib>=1.2.0
+pip install threadpoolctl>=3.1.0
+
+# Cài đặt các thư viện phụ thuộc
+pip install pydantic>=2.6.3
+pip install annotated-types>=0.6.0
+pip install typing-extensions>=4.12.2
+pip install typing-inspection>=0.4.0
+
+# Cài đặt OpenAI và các thư viện liên quan
+pip install openai==1.12.0
+pip install tiktoken==0.6.0
+
+# Cài đặt LangChain và các components
+pip install langchain==0.1.12
+pip install langchain-openai==0.0.8
+pip install langchain-community>=0.0.28,<0.1
+
+# Cài đặt ChromaDB và BM25
+pip install chromadb==0.4.24
+pip install rank-bm25==0.2.2
+
+# Cài đặt FastAPI và Uvicorn
+pip install fastapi==0.110.0
+pip install "uvicorn[standard]"==0.27.1

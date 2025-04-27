@@ -8,12 +8,11 @@ from dataclasses import dataclass
 import re
 from pydantic import Field, BaseModel
 
-from layers._01_data_ingestion.loader import DataIngestion
-from layers._02_chunking.chunker import Chunking
-from layers._03_embedding.embedder import Embedding
-from layers._04_retrieval.retriever import Retrieval
-from layers._05_generation.generator import Generation
-from layers._06_evaluation.evaluator import Evaluation
+from layers._01_data_ingestion.loader import load_faq_data, preprocess_faq_data
+from layers._03_embedding.embedder import create_vectordb
+from layers._04_retrieval.retriever import create_bm25_retriever, create_hybrid_retriever, CustomHybridRetriever
+from layers._05_generation.generator import create_hybrid_qa_chain
+from layers._06_evaluation.evaluator import evaluate_qa_system, print_evaluation_results
 from test_data import TEST_DATA
 
 # Cài đặt thư viện cần thiết
@@ -54,28 +53,27 @@ def main():
     os.environ["OPENAI_API_KEY"] = api_key
     
     # Data Ingestion Layer
-    data_ingestion = DataIngestion()
-    documents = data_ingestion.load_and_preprocess_faq_data()
-    
-    # Chunking Layer
-    chunking = Chunking()
-    chunked_documents = chunking.chunk_documents(documents)
+    documents = load_faq_data("data/TinhNangApp.json")
+    processed_documents = preprocess_faq_data(documents)
     
     # Embedding Layer
-    embedding = Embedding(model_name=embedding_model)
-    vectordb = embedding.create_vector_db(chunked_documents)
+    vectordb = create_vectordb(processed_documents)
     
     # Retrieval Layer
-    retrieval = Retrieval(vectordb=vectordb, documents=chunked_documents, k=top_k, vector_weight=vector_weight)
-    hybrid_retriever = retrieval.create_hybrid_retriever()
+    bm25_retriever = create_bm25_retriever(processed_documents, k=top_k)
+    hybrid_retriever = create_hybrid_retriever(
+        vectordb=vectordb,
+        bm25_retriever=bm25_retriever,
+        vector_weight=vector_weight,
+        k=top_k
+    )
     
     # Generation Layer
-    generation = Generation(model_name=model_name)
-    qa_chain = generation.create_qa_chain(hybrid_retriever)
+    qa_chain = create_hybrid_qa_chain(hybrid_retriever)
     
     # Evaluation Layer
-    evaluation_results = Evaluation.evaluate_qa_system(qa_chain, TEST_DATA)
-    Evaluation.print_evaluation_results(evaluation_results)
+    evaluation_results = evaluate_qa_system(qa_chain, TEST_DATA)
+    print_evaluation_results(evaluation_results)
 
 if __name__ == "__main__":
     main()
