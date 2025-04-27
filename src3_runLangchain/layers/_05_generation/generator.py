@@ -5,10 +5,8 @@ It combines retrieved documents with user questions to create good answers.
 
 from typing import List, Dict, Any, Optional
 from langchain_core.documents import Document
-from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
+from openai import OpenAI
+import httpx
 from dotenv import load_dotenv
 import os
 
@@ -17,55 +15,47 @@ load_dotenv()
 
 class AnswerGenerator:
     """
-    A class that helps generate answers using AI models.
+    A class that helps generate answers using OpenAI models.
     
     This class can:
     - Combine documents with questions
-    - Use AI models to generate answers
+    - Use OpenAI models to generate answers
     - Format answers nicely
     """
     
     def __init__(
         self,
         model_name: str = "gpt-3.5-turbo",
-        temperature: float = 0.7
+        temperature: float = 0.7,
+        max_tokens: int = 10000
     ):
         """
         Start the AnswerGenerator with optional model settings.
         
         Args:
-            model_name: Name of the AI model to use
+            model_name: Name of the OpenAI model to use
             temperature: How creative the answers should be (0.0 to 1.0)
+            max_tokens: Maximum number of tokens in the response
             
         Example:
             >>> generator = AnswerGenerator(model_name="gpt-4")
             >>> answer = generator.generate_answer("What is RAG?", documents)
         """
-        self.llm = ChatOpenAI(
-            model_name=model_name,
-            temperature=temperature
-        )
-        
-        # Create the prompt template
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a helpful assistant that answers questions based on the given context.
-            If you don't know the answer, say you don't know.
-            Use only the information from the context to answer.
-            Keep your answers clear and simple."""),
-            ("human", """Context: {context}
+        # Initialize OpenAI client with proxy support if needed
+        if os.getenv("OPENAI_PROXY"):
+            http_client = httpx.Client(proxies=os.getenv("OPENAI_PROXY"))
+            self.client = OpenAI(
+                http_client=http_client,
+                api_key=os.getenv("OPENAI_API_KEY")
+            )
+        else:
+            self.client = OpenAI(
+                api_key=os.getenv("OPENAI_API_KEY")
+            )
             
-            Question: {question}
-            
-            Answer:""")
-        ])
-        
-        # Create the chain
-        self.chain = (
-            {"context": RunnablePassthrough(), "question": RunnablePassthrough()}
-            | self.prompt
-            | self.llm
-            | StrOutputParser()
-        )
+        self.model_name = model_name
+        self.temperature = temperature
+        self.max_tokens = max_tokens
     
     def format_context(self, documents: List[Document]) -> str:
         """
@@ -90,7 +80,7 @@ class AnswerGenerator:
         format_context: bool = True
     ) -> str:
         """
-        Generate an answer using the AI model.
+        Generate an answer using the OpenAI model.
         
         Args:
             question: The question to answer
@@ -109,10 +99,25 @@ class AnswerGenerator:
         else:
             context = documents[0].page_content if documents else ""
             
-        return self.chain.invoke({
-            "context": context,
-            "question": question
-        })
+        # Create the prompt
+        prompt = f"""Context: {context}
+
+Question: {question}
+
+Answer:"""
+        
+        # Call OpenAI API directly
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that answers questions based on the given context. If you don't know the answer, say you don't know. Use only the information from the context to answer. Keep your answers clear and simple."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=self.temperature,
+            max_tokens=self.max_tokens
+        )
+        
+        return response.choices[0].message.content
     
     def generate_answer_with_sources(
         self,
@@ -169,8 +174,8 @@ if __name__ == "__main__":
     # Test basic answer generation
     print("\nTesting basic answer generation...")
     try:
-        generator = AnswerGenerator()
-        answer = generator.generate_answer("What is RAG?", sample_docs)
+        answer_gen = AnswerGenerator()
+        answer = answer_gen.generate_answer("What is RAG?", sample_docs)
         print(f"Generated answer: {answer}")
     except Exception as e:
         print(f"Basic generation test failed: {e}")
@@ -178,7 +183,7 @@ if __name__ == "__main__":
     # Test answer with sources
     print("\nTesting answer with sources...")
     try:
-        result = generator.generate_answer_with_sources("What is RAG?", sample_docs)
+        result = answer_gen.generate_answer_with_sources("What is RAG?", sample_docs)
         print(f"Answer: {result['answer']}")
         print(f"Sources: {result['sources']}")
     except Exception as e:
@@ -187,8 +192,8 @@ if __name__ == "__main__":
     # Test with different model
     print("\nTesting with different model...")
     try:
-        generator = AnswerGenerator(model_name="gpt-4", temperature=0.5)
-        answer = generator.generate_answer("What is RAG?", sample_docs)
+        answer_gen = AnswerGenerator(model_name="gpt-4", temperature=0.5)
+        answer = answer_gen.generate_answer("What is RAG?", sample_docs)
         print(f"Generated answer with GPT-4: {answer}")
     except Exception as e:
         print(f"Model test failed: {e}")
