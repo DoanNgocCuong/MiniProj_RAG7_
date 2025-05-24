@@ -12,7 +12,7 @@ from layers._01_data_ingestion.loader import load_faq_data, preprocess_faq_data
 from layers._03_embedding.embedder import DocumentEmbedder
 from layers._04_retrieval.retriever import DocumentRetriever
 from layers._05_generation.generator import AnswerGenerator
-from layers._06_evaluation.evaluator import RAGEvaluator
+from system.baselineRAG.MiniProj_RAG7_LangChain.src3_runLangchain.layers._06_evaluation.evaluator_ckp import RAGEvaluator
 from test_data import TEST_DATA
 
 # Cài đặt thư viện cần thiết
